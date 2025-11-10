@@ -1,16 +1,26 @@
-import React, { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import React, { useEffect, useState, useRef } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
 
 const Header = () => {
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const dropdownRef = useRef(null);
 
-  // Get user from localStorage on mount
+  // Fetch user from localStorage and keep updated
   useEffect(() => {
-    const storedUser = localStorage.getItem('user');
-    if (storedUser) {
-      setUser(JSON.parse(storedUser));
-    }
+    const updateUser = () => {
+      const storedUser = localStorage.getItem('user');
+      if (storedUser) {
+        setUser(JSON.parse(storedUser));
+      } else {
+        setUser(null);
+      }
+    };
+
+    updateUser();
+    window.addEventListener('storage', updateUser);
+    return () => window.removeEventListener('storage', updateUser);
   }, []);
 
   // Handle logout
@@ -18,19 +28,31 @@ const Header = () => {
     localStorage.removeItem('user');
     localStorage.removeItem('token');
     setUser(null);
+    setIsDropdownOpen(false);
     navigate('/user/login');
   };
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = event => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   return (
     <header className="bg-white shadow-md py-4 px-6 flex justify-between items-center sticky top-0 z-50">
       {/* Left - Logo / Brand */}
-      <Link
-        to="/"
-        className="text-2xl font-bold text-blue-600">
-        MyApp
-      </Link>
+      <div
+        onClick={() => navigate('/')}
+        className="text-2xl font-bold text-blue-600 cursor-pointer select-none">
+        SkillSync
+      </div>
 
-      {/* Middle - Navigation (Demo links for now) */}
+      {/* Middle - Navigation */}
       <nav className="hidden md:flex space-x-6 text-gray-700 font-medium">
         <Link
           to="/"
@@ -50,22 +72,72 @@ const Header = () => {
       </nav>
 
       {/* Right - User Section */}
-      <div className="flex items-center space-x-4">
+      <div
+        className="relative flex items-center space-x-4"
+        ref={dropdownRef}>
         {user ? (
           <>
-            <div className="flex items-center space-x-2">
-              <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-white font-semibold">
-                {user.name?.charAt(0).toUpperCase()}
-              </div>
-              <span className="text-gray-800 font-medium">
+            <div
+              onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+              className="flex items-center space-x-2 cursor-pointer">
+              <img
+                src={
+                  user.profilePhoto ||
+                  'https://cdn-icons-png.flaticon.com/512/149/149071.png'
+                }
+                alt="User"
+                className="w-10 h-10 rounded-full object-cover border-2 border-blue-500"
+              />
+              <span className="text-gray-800 font-medium hidden sm:inline-block">
                 {user.name?.split(' ')[0]}
               </span>
             </div>
-            <button
-              onClick={handleLogout}
-              className="px-3 py-1 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-all">
-              Logout
-            </button>
+
+            {/* Dropdown Menu */}
+            {isDropdownOpen && (
+              <div className="absolute right-0 top-14 bg-white border rounded-xl shadow-lg w-56 py-3 z-50">
+                <div className="flex flex-col items-center text-center border-b pb-3">
+                  <img
+                    src={
+                      user.profilePhoto ||
+                      'https://cdn-icons-png.flaticon.com/512/149/149071.png'
+                    }
+                    alt="Profile"
+                    className="w-16 h-16 rounded-full border-2 border-blue-400 object-cover"
+                  />
+                  <h3 className="mt-2 text-gray-900 font-semibold">
+                    {user.name}
+                  </h3>
+                  <p className="text-sm text-gray-500">{user.email}</p>
+                </div>
+
+                <div className="mt-3 px-4 space-y-2">
+                  <button
+                    onClick={() => {
+                      navigate('/user/dashboard');
+                      setIsDropdownOpen(false);
+                    }}
+                    className="w-full text-left px-3 py-2 rounded-md hover:bg-blue-50 hover:text-blue-600 transition">
+                    🧭 Dashboard
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      navigate('/user/profile');
+                      setIsDropdownOpen(false);
+                    }}
+                    className="w-full text-left px-3 py-2 rounded-md hover:bg-blue-50 hover:text-blue-600 transition">
+                    👤 View Profile
+                  </button>
+
+                  <button
+                    onClick={handleLogout}
+                    className="w-full text-left px-3 py-2 text-red-600 rounded-md hover:bg-red-50 hover:text-red-700 transition">
+                    🚪 Logout
+                  </button>
+                </div>
+              </div>
+            )}
           </>
         ) : (
           <button

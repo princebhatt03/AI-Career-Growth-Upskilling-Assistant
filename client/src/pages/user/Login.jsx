@@ -1,55 +1,38 @@
 import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
-import { ToastContainer, toast } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css';
+import { useNavigate } from 'react-router-dom';
+import { Toaster, toast } from 'react-hot-toast';
 import API from '../../services/api';
 import Header from '../../components/Header';
 
 const Login = () => {
   const navigate = useNavigate();
-
-  const [formData, setFormData] = useState({
-    email: '',
-    password: '',
-  });
-
+  const [formData, setFormData] = useState({ email: '', password: '' });
   const [loading, setLoading] = useState(false);
 
-  // handle input change
   const handleChange = e => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value,
-    });
+    setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  // handle login submit
   const handleSubmit = async e => {
     e.preventDefault();
     const { email, password } = formData;
 
     if (!email || !password) {
-      toast.error('Please fill in all fields!');
+      toast.error('Please fill in both fields!');
       return;
     }
 
     try {
       setLoading(true);
-
       const { data } = await API.post('/user/login', { email, password });
 
-      // Store token & user info in localStorage
       localStorage.setItem('token', data.token);
       localStorage.setItem('user', JSON.stringify(data));
 
-      toast.success('Login successful! Redirecting...');
-
-      // Redirect to dashboard after a short delay
-      setTimeout(() => navigate('/user/dashboard'), 1500);
+      toast.success('Login successful!');
+      setTimeout(() => navigate('/user/dashboard'), 1200);
     } catch (error) {
-      const errMsg =
-        error.response?.data?.message ||
-        'Invalid credentials. Please try again.';
+      const errMsg = error.response?.data?.message || 'Invalid credentials.';
       toast.error(errMsg);
     } finally {
       setLoading(false);
@@ -59,11 +42,11 @@ const Login = () => {
   return (
     <>
       <Header />
-      <div className="flex items-center justify-center min-h-screen bg-gray-50">
-        <ToastContainer
-          position="top-right"
-          autoClose={3000}
-        />
+      <Toaster
+        position="top-center"
+        reverseOrder={false}
+      />
+      <div className="flex items-center justify-center min-h-screen bg-gray-50 px-3">
         <div className="bg-white p-8 rounded-2xl shadow-md w-full max-w-md">
           <h2 className="text-2xl font-bold text-center mb-6 text-gray-800">
             Login to Your Account
@@ -72,7 +55,6 @@ const Login = () => {
           <form
             onSubmit={handleSubmit}
             className="space-y-4">
-            {/* Email */}
             <div>
               <label className="block text-gray-700 font-medium mb-1">
                 Email Address
@@ -80,14 +62,13 @@ const Login = () => {
               <input
                 type="email"
                 name="email"
-                placeholder="Enter your email"
                 value={formData.email}
                 onChange={handleChange}
+                placeholder="Enter your email"
                 className="w-full px-4 py-2 border rounded-lg focus:ring focus:ring-blue-300 outline-none"
               />
             </div>
 
-            {/* Password */}
             <div>
               <label className="block text-gray-700 font-medium mb-1">
                 Password
@@ -95,14 +76,13 @@ const Login = () => {
               <input
                 type="password"
                 name="password"
-                placeholder="Enter your password"
                 value={formData.password}
                 onChange={handleChange}
+                placeholder="Enter your password"
                 className="w-full px-4 py-2 border rounded-lg focus:ring focus:ring-blue-300 outline-none"
               />
             </div>
 
-            {/* Submit Button */}
             <button
               type="submit"
               disabled={loading}
@@ -113,11 +93,12 @@ const Login = () => {
 
           <p className="text-center text-gray-600 mt-4">
             Don’t have an account?{' '}
-            <Link
-              to="/user/register"
+            <button
+              type="button"
+              onClick={() => navigate('/user/register')}
               className="text-blue-600 hover:underline">
               Register
-            </Link>
+            </button>
           </p>
         </div>
       </div>
