@@ -1,3 +1,4 @@
+// controllers/user.controller.js
 const User = require('../models/user.model');
 const generateToken = require('../utils/generateToken');
 const asyncHandler = require('express-async-handler');
@@ -22,9 +23,9 @@ const uploadToCloudinary = fileBuffer => {
   });
 };
 
-// @desc    Register new user
-// @route   POST /api/user/register
-// @access  Public
+// ---------------------------
+// Register
+// ---------------------------
 const registerUser = asyncHandler(async (req, res) => {
   try {
     const { name, email, password, mobile } = req.body;
@@ -48,7 +49,7 @@ const registerUser = asyncHandler(async (req, res) => {
     }
 
     // Handle file upload
-    if (req.file) {
+    if (req.file && req.file.buffer) {
       console.log('📤 Uploading image to Cloudinary...');
       try {
         const uploadResult = await uploadToCloudinary(req.file.buffer);
@@ -93,13 +94,17 @@ const registerUser = asyncHandler(async (req, res) => {
     }
   } catch (error) {
     console.error('🔥 Registration Error:', error.message);
-    res.status(500).json({ message: error.message });
+    // If we already set error status above, keep it. Otherwise 500.
+    if (!res.headersSent)
+      res
+        .status(res.statusCode === 200 ? 500 : res.statusCode)
+        .json({ message: error.message });
   }
 });
 
-// @desc    Login user
-// @route   POST /api/user/login
-// @access  Public
+// ---------------------------
+// Login
+// ---------------------------
 const loginUser = asyncHandler(async (req, res) => {
   const { email, password } = req.body;
 
@@ -132,9 +137,9 @@ const loginUser = asyncHandler(async (req, res) => {
   });
 });
 
-// @desc    Get user profile
-// @route   GET /api/user/profile
-// @access  Private
+// ---------------------------
+// Get Profile
+// ---------------------------
 const getUserProfile = asyncHandler(async (req, res) => {
   const user = await User.findById(req.user.id).select('-password');
 
@@ -146,8 +151,124 @@ const getUserProfile = asyncHandler(async (req, res) => {
   }
 });
 
+// ---------------------------
+// Update Profile (requires currentPassword for confirmation)
+// Route: PUT /api/user/profile
+// Access: Private
+// Body:
+//   currentPassword: string (required)
+//   name, email, mobile (optional)
+//   newPassword (optional)
+//   (optional) file upload in req.file (profile photo)
+// ---------------------------
+const updateUserProfile = asyncHandler(async (req, res) => {
+  const user = await User.findById(req.user.id);
+  if (!user) {
+    res.status(404);
+    throw new Error('User not found');
+  }
+
+  const { currentPassword, name, email, mobile, newPassword } = req.body;
+
+  // Confirm current password for any profile updates
+  if (!currentPassword) {
+    res.status(400);
+    throw new Error('Current password is required to confirm profile changes');
+  }
+
+  const isMatch = await user.matchPassword(currentPassword);
+  if (!isMatch) {
+    res.status(401);
+    throw new Error('Current password is incorrect');
+  }
+
+  // Email change: ensure uniqueness
+  if (email && email !== user.email) {
+    const existing = await User.findOne({ email });
+    if (existing) {
+      res.status(400);
+      throw new Error('Email is already taken by another account');
+    }
+    user.email = email;
+  }
+
+  if (name) user.name = name;
+  if (mobile !== undefined) user.mobile = mobile;
+
+  // Profile photo upload if provided
+  if (req.file && req.file.buffer) {
+    try {
+      const uploadResult = await uploadToCloudinary(req.file.buffer);
+      user.profilePhoto = uploadResult.secure_url;
+    } catch (uploadError) {
+      console.error(
+        'Cloudinary upload error during update:',
+        uploadError.message
+      );
+      res.status(500);
+      throw new Error('Failed to upload new profile photo');
+    }
+  }
+
+  // Change password if requested
+  if (newPassword) {
+    if (newPassword.length < 8) {
+      res.status(400);
+      throw new Error('New password must be at least 8 characters long');
+    }
+    user.password = newPassword; // assuming User model pre-save hashes it
+  }
+
+  const updatedUser = await user.save();
+
+  res.status(200).json({
+    _id: updatedUser._id,
+    name: updatedUser.name,
+    email: updatedUser.email,
+    mobile: updatedUser.mobile,
+    profilePhoto: updatedUser.profilePhoto,
+    role: updatedUser.role,
+    token: generateToken(updatedUser._id), // refresh token after changes
+  });
+});
+
+// ---------------------------
+// Delete Profile (requires currentPassword for confirmation)
+// Route: DELETE /api/user/profile
+// Access: Private
+// Body: { currentPassword: string }
+// ---------------------------
+const deleteUserProfile = asyncHandler(async (req, res) => {
+  const user = await User.findById(req.user.id);
+  if (!user) {
+    res.status(404);
+    throw new Error('User not found');
+  }
+
+  const { currentPassword } = req.body;
+  if (!currentPassword) {
+    res.status(400);
+    throw new Error('Current password is required to confirm account deletion');
+  }
+
+  const isMatch = await user.matchPassword(currentPassword);
+  if (!isMatch) {
+    res.status(401);
+    throw new Error('Current password is incorrect');
+  }
+
+  // ✅ Delete the user using Mongoose v7-compatible method
+  await User.findByIdAndDelete(req.user.id);
+
+  console.log(`🗑️ User deleted successfully: ${user.email}`);
+
+  res.status(200).json({ message: 'User account deleted successfully' });
+});
+
 module.exports = {
   registerUser,
   loginUser,
   getUserProfile,
+  updateUserProfile,
+  deleteUserProfile,
 };

@@ -6,6 +6,7 @@ import ErrorPage from './pages/ErrorPage';
 import Register from './pages/user/Register';
 import Login from './pages/user/Login';
 import Dashboard from './pages/user/Dashboard';
+import Profile from './pages/user/Profile';
 
 export default function App() {
   return (
@@ -28,6 +29,10 @@ export default function App() {
           <Route
             path="/user/login"
             element={<Login />}
+          />
+          <Route
+            path="/user/profile"
+            element={<Profile />}
           />
           <Route
             path="/user/dashboard"
